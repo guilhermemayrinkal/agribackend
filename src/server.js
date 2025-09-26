@@ -75,15 +75,40 @@ app.use(helmet({
 
 // CORS configuration para HTTPS
 app.use(cors({
-  origin: process.env.FRONTEND_URL?.split(',') || [
-    'https://elenilson.vercel.app',
-    'http://localhost:5173'
-  ],
+  origin: function (origin, callback) {
+    // Lista de origens permitidas
+    const allowedOrigins = [
+      'https://elenilson.vercel.app',
+      'https://evolution-agrinode.qsibeh.easypanel.host',
+      'http://localhost:5173'
+    ];
+
+    // Permitir requisições sem origin (como mobile apps ou postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked for origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
+app.options('*', cors()); // 🔥 IMPORTANTE: Isso resolve o preflight
 // Static files
 const uploadsDir = path.resolve(__dirname, '../uploads');
 app.use('/uploads', express.static(uploadsDir, {
