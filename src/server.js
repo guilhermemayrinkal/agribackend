@@ -3,14 +3,12 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
-const path = require('path'); // <— ADICIONE
+const path = require('path');
 require('dotenv').config();
 
 const http = require('http');
 const { Server } = require('socket.io');
 const { initChatSocket } = require('./sockets/chatSocket');
-
-
 
 const { testConnection } = require('./config/database');
 const { generalLimiter } = require('./middleware/rateLimiter');
@@ -37,33 +35,57 @@ const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const fileRoutes = require('./routes/fileRoutes');
 
-
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5174; // Use a porta do seu .env
 const API_VERSION = process.env.API_VERSION || 'v1';
 
+// Configuração para HTTPS no EasyPanel
+app.set('trust proxy', true); // 🔥 IMPORTANTE: Confia no proxy do EasyPanel
+
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+
+// Configuração do Socket.io para HTTPS
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL?.split(',') || [
+      'https://elenilson.vercel.app',
+      'http://localhost:5173'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST']
+  },
+  transports: ['websocket', 'polling'] // Suporte melhorado
+});
 
 initChatSocket(io);
-
-server.listen(5175, () => {
-  console.log('API running...');
-});
 
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https:", "wss:"]
+    }
+  }
 }));
+
+// CORS configuration para HTTPS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
+  origin: process.env.FRONTEND_URL?.split(',') || [
+    'https://elenilson.vercel.app',
+    'http://localhost:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Static: servir arquivos enviados
+// Static files
 const uploadsDir = path.resolve(__dirname, '../uploads');
-// se o seu server.js não estiver em src/ e sim na raiz do backend, use: path.resolve(__dirname, 'uploads')
-
 app.use('/uploads', express.static(uploadsDir, {
   maxAge: '1d',
   etag: true,
@@ -78,16 +100,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Rate limiting
 // app.use(generalLimiter);
 
-// Trust proxy for accurate IP addresses
-app.set('trust proxy', 1);
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     success: true,
     message: 'BusinessAnalytics API is running',
     timestamp: new Date().toISOString(),
-    version: API_VERSION
+    version: API_VERSION,
+    environment: process.env.NODE_ENV || 'development',
+    protocol: req.protocol, // Mostrará 'https' no EasyPanel
+    secure: req.secure // Mostrará true no EasyPanel
   });
 });
 
@@ -128,12 +150,12 @@ const startServer = async () => {
       process.exit(1);
     }
 
-    app.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => { // 🔥 IMPORTANTE: Escutar em 0.0.0.0
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 BusinessAnalytics API ${API_VERSION}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-      console.log(`📚 API Base URL: http://localhost:${PORT}/api/${API_VERSION}`);
+      console.log(`🔗 Health check: https://your-domain.easypanel.host/health`);
+      console.log(`📚 API Base URL: https://your-domain.easypanel.host/api/${API_VERSION}`);
       console.log(`\n📋 Available Endpoints:`);
       console.log(`   🔐 Auth: /api/${API_VERSION}/auth`);
       console.log(`   👥 Users: /api/${API_VERSION}/users`);
@@ -145,7 +167,6 @@ const startServer = async () => {
       console.log(`   🚨 Alerts: /api/${API_VERSION}/alerts`);
       console.log(`   💡 Insights: /api/${API_VERSION}/insights`);
       console.log('🖼️ Serving uploads from:', uploadsDir);
-
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -158,12 +179,16 @@ startServer();
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM received, shutting down gracefully');
-  process.exit(0);
+  server.close(() => {
+    process.exit(0);
+  });
 });
 
 process.on('SIGINT', () => {
   console.log('👋 SIGINT received, shutting down gracefully');
-  process.exit(0);
+  server.close(() => {
+    process.exit(0);
+  });
 });
 
 module.exports = app;
