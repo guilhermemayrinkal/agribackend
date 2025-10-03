@@ -21,7 +21,7 @@ pids
 coverage/
 
 # Uploads
-uploads/
+# uploads/
 
 # IDE
 .vscode/
