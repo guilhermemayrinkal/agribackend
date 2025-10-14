@@ -80,7 +80,8 @@ app.use(cors({
     const allowedOrigins = [
       'https://elenilson.vercel.app',
       'https://evolution-agrinode.qsibeh.easypanel.host',
-      'http://localhost:5173'
+      'http://localhost:5173',
+      'https://www.agriplanconsultoria.com.br'
     ];
 
     // Permitir requisições sem origin (como mobile apps ou postman)
