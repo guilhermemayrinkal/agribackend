@@ -209,12 +209,13 @@ const createPublicSignup = async (req, res, next) => {
 const processSubscription = async (req, res, next) => {
   try {
     const { signupId, paymentData } = req.body;
-
+    console.log('BILLING INTERVEALL ### ' + paymentData?.billingInterval);
     // 0) Normaliza pagamento
     const method = (paymentData?.method || 'card').toLowerCase(); // 'card' | 'pix' | 'boleto'
-    let billingInterval = (paymentData?.billingInterval === 'yearly') ? 'yearly' : 'monthly';
+    let billingInterval = (paymentData?.billingInterval == 'yearly' || paymentData?.billingInterval == 'annual') ? 'yearly' : 'monthly';
+    console.log('BILLING INTERVEALL ### ' + billingInterval);
     if (method === 'pix' || method === 'boleto') {
-      if (billingInterval !== 'yearly') {
+      if (billingInterval !== 'yearly' && billingInterval !== 'annual') {
         return res.status(400).json({
           success: false,
           message: 'PIX e Boleto estão disponíveis somente no plano ANUAL.'
@@ -240,7 +241,8 @@ const processSubscription = async (req, res, next) => {
     try { signupDetails = JSON.parse(signup.signup_data); } catch { signupDetails = {}; }
 
     // 3) Password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    const tempPassword = '123456';
+    // const tempPassword = Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
     // 4) Analyst

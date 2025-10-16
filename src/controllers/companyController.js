@@ -46,7 +46,7 @@ const getCompanies = async (req, res, next) => {
         c.property, c.cultures, c.area, c.area_unit, c.street, c.number, 
         c.complement, c.neighborhood, c.city, c.state, c.zip_code,
         c.avatar, c.dashboard_url, c.is_active, c.created_at, c.updated_at,
-        u.name as analyst_name, u.email as analyst_email
+        u.name as analyst_name, u.email as analyst_email, u.id as analyst_id
        FROM companies c
        LEFT JOIN users u ON c.analyst_id = u.id
        ${whereClause}
@@ -499,6 +499,66 @@ const getCompanyDashboard = async (req, res, next) => {
   }
 };
 
+const updateCompanyAnalyst = async (req, res, next) => {
+  try {
+    // const companyId = req.params.id;
+    const { companyId } = req.params;
+    const { analyst_id } = req.body;
+
+    console.log('COMPANY D ID ' + companyId);
+    console.log('analyst_id D ID ' + analyst_id);
+    if (!analyst_id) {
+      return res.status(400).json({ success: false, message: 'analyst_id é obrigatório' });
+    }
+
+    // 1) Verifica se empresa existe
+    const [company] = await executeQuery('SELECT id FROM companies WHERE id = ?', [companyId]);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Empresa não encontrada' });
+    }
+
+    // 2) Verifica se o analista existe e é analista
+    const [analyst] = await executeQuery(
+      'SELECT id, role, name FROM users WHERE id = ? AND role = ? AND is_active = TRUE',
+      [analyst_id, 'analyst']
+    );
+    if (!analyst) {
+      return res.status(400).json({ success: false, message: 'Analista inválido' });
+    }
+
+    // 3) Atualiza empresa
+    await executeQuery(
+      'UPDATE companies SET analyst_id = ?, updated_at = NOW() WHERE id = ?',
+      [analyst_id, companyId]
+    );
+
+    // (opcional) garantir que exista conversa com o novo analista
+    // UNIQUE (company_id, analyst_id) em chat_conversations
+    await executeQuery(
+      `INSERT IGNORE INTO chat_conversations (company_id, analyst_id, title)
+       VALUES (?, ?, 'Conversa')`,
+      [companyId, analyst_id]
+    );
+
+    // 4) Retorna empresa com nome do analista
+    const [updated] = await executeQuery(
+      `SELECT c.*, u.name AS analyst_name
+         FROM companies c
+         LEFT JOIN users u ON u.id = c.analyst_id
+        WHERE c.id = ?`,
+      [companyId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Analista atribuído com sucesso',
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getCompanies,
   getCompanyById,
@@ -506,5 +566,6 @@ module.exports = {
   updateCompany,
   toggleStatusCompany,
   deleteCompany,
-  getCompanyDashboard
+  getCompanyDashboard,
+  updateCompanyAnalyst
 };

@@ -1,9 +1,9 @@
 const express = require('express');
 const { authenticateToken, authorize, authorizeCompanyAccess } = require('../middleware/auth');
-const { 
-  validateCompany, 
-  validateCompanyId, 
-  validatePagination 
+const {
+  validateCompany,
+  validateCompanyId,
+  validatePagination
 } = require('../middleware/validation');
 const {
   getCompanies,
@@ -12,7 +12,8 @@ const {
   updateCompany,
   toggleStatusCompany,
   deleteCompany,
-  getCompanyDashboard
+  getCompanyDashboard,
+  updateCompanyAnalyst
 } = require('../controllers/companyController');
 
 const router = express.Router();
@@ -35,6 +36,8 @@ router.get('/:companyId', validateCompanyId, authorizeCompanyAccess, getCompanyB
 // @access  Private (Admin, Analyst, Client)
 router.get('/:companyId/dashboard', validateCompanyId, authorizeCompanyAccess, getCompanyDashboard);
 
+
+
 // @route   POST /api/v1/companies
 // @desc    Create new company
 // @access  Private (Admin, Analyst)
@@ -49,6 +52,8 @@ router.put('/:companyId', authorize('admin', 'analyst'), validateCompanyId, upda
 // @desc    Toggle status company
 // @access  Private (Admin, Analyst - only assigned companies)
 router.put('/companies_toggle/:companyId', authorize('admin', 'analyst'), validateCompanyId, toggleStatusCompany);
+
+router.put('/analyst-toggle/:companyId/analyst', authorize('admin'), validateCompanyId, updateCompanyAnalyst);
 
 // @route   DELETE /api/v1/companies/:id
 // @desc    Delete company
